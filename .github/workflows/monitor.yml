@@ -1,0 +1,49 @@
+name: Monitor lodzkagaleriasztuki.pl
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # dostępność, treść, mapa, ads.txt, certyfikat
+    - cron: "17 6 * * *"     # codziennie: rekordy DNS poczty
+    - cron: "11 3 1 * *"     # raz w miesiącu: podtrzymanie harmonogramu
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http:
+    if: github.event.schedule != '17 6 * * *' && github.event.schedule != '11 3 1 * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node sprawdz.mjs
+
+  dns:
+    if: github.event.schedule == '17 6 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node sprawdz.mjs --dns
+
+  # GitHub wyłącza harmonogram publicznego repo po 60 dniach bez aktywności.
+  podtrzymanie:
+    if: github.event.schedule == '11 3 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          date -u +%Y-%m-%dT%H:%M:%SZ > .podtrzymanie
+          git config user.name "lgs-monitor"
+          git config user.email "lgs-monitor@users.noreply.github.com"
+          git add .podtrzymanie
+          git commit -m "chore: podtrzymanie harmonogramu" && git push
